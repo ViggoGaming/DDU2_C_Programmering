@@ -27,7 +27,7 @@ ser = serial.Serial(
     parity=serial.PARITY_NONE,
     stopbits=serial.STOPBITS_ONE,
     bytesize=serial.EIGHTBITS,
-    timeout=0.1,
+    timeout=None,
 )
 
 ser.flushInput()
@@ -63,8 +63,8 @@ while True:
             Turns on left or right ear.
         """)
     else:
-        ser.write((command+EOL).encode())
-        print((command+EOL).encode())
+        ser.write((command+EOT+EOL).encode())
+        print((command+EOT+EOL).encode())
 
         # Listen
         while True:
