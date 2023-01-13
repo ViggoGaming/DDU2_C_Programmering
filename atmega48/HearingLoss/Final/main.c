@@ -210,6 +210,9 @@ volatile uint8_t bufferIndex = 0;
 volatile uint8_t readIndex = 0;
 volatile bool byteReceived = false;
 
+// Array of frequencies to use in the full test
+int test_frequencies[8] = {100, 200, 400, 800, 1600, 3200, 6400, 10000};
+
 void setLight(bool);
 
 ISR(USART_RX_vect) {
@@ -256,11 +259,11 @@ void txLine(char data[]) {
   }
 }
 
-// void txUint(uint16_t n) {
-//     char s[16];
-//     utoa(n, s, 10);
-//     txLine(s);<
-// }
+void txUint(uint16_t n) {
+  char s[16];
+  utoa(n, s, 10);
+  txLine(s);
+}
 
 unsigned char rxByte(void) {
   while (!(UCSR0A & (1 << RXC0)))
@@ -349,26 +352,34 @@ void setEar(bool right) {
   }
 }
 
+bool pLeftIsPressed = false;
+bool pRightIsPressed = false;
+
 void update() {
-  // Buttons are pulled up, and 0 when pressed.
-  bool leftIsPressed = !BITVAL(PINC, PC4);
-  bool rightIsPressed = !BITVAL(PINC, PC5);
+  if (tonePlaying) {
+    // Buttons are pulled up, and 0 when pressed.
+    bool leftIsPressed = !BITVAL(PINC, PC4);
+    bool rightIsPressed = !BITVAL(PINC, PC5);
 
-  // Check button input
-  if (leftIsPressed || rightIsPressed) {
-    reactionTime = toneTimer;
-    setSound(false);
-    // Variable that contains which button is pressed, if the right isn't
-    // pressed, the left is.
-    pressedButton = rightIsPressed;
-  }
-  // Check timeout
-  if (toneTimer > toneDuration) {
-    setSound(false);
+    // Check button input
+    if ((leftIsPressed && !pLeftIsPressed) ||
+        (rightIsPressed && !pRightIsPressed)) {
+      reactionTime = toneTimer;
+      setSound(false);
+      // Variable that contains which button is pressed, if the right isn't
+      // pressed, the left is.
+      pressedButton = rightIsPressed;
+    }
+    // Check timeout
+    if (toneTimer > toneDuration) {
+      setSound(false);
+    }
+
+    // Update previous-values
+    pLeftIsPressed = leftIsPressed;
+    pRightIsPressed = pRightIsPressed;
   }
 }
-
-void breakUpdate() {}
 
 void setupTimer0() {
   // Timer0 counts milliseconds. Not EXACT milliseconds, but close enough for
@@ -400,32 +411,35 @@ int main(void) {
 
   // Sets PB1 as output for transmitting sound and PB0 as output for turning on
   // RIGHT ear
-  DDRB = (1 << PB1) | (1 << PB0) | (1 << PB2);
+  DDRB = (1 << PB1) | (1 << PB0);
   // Sets PC2 and PC3 as output to control the arcade button led
   DDRC = (1 << PC3) | (1 << PC2);
   // PC4 and PC5 are input for the buttons. PC4 is left, PC5 is right.
   // Sets PD1 as output for transmitting UART data, PD7 as output for turning on
   // LEFT ear.
-  // DDRD = (1 << PD1) | (1 << PD7);
-  DDRD = (1 << PD1);
+  DDRD = (1 << PD1) | (1 << PD7);
+
   // Setup timers
   setupTimer0();
   setupTimer1();
 
+  // Right ear on as standard
+  setEar(true);
+
   // enable global interrups
   sei();
 
+  // Main loop
   while (1) {
     // Listen and update
     bool listening = true;
     while (listening) { // Listen until EOL character
-      // update();
+      update();
       if (byteReceived) { // When we recieve a byte
         byteReceived = false;
         if (uartBuffer[bufferIndex - 1] == EOL) {   // If its EOL
           if (uartBuffer[bufferIndex - 2] == EOT) { // If its EOT
             // Exit listening loop and respond
-            breakUpdate();
             listening = false;
           }
         }
@@ -435,7 +449,7 @@ int main(void) {
     // React and respond
     readIndex = 0;
     bool inputError = false;
-    if (bufferContains("lights")) {
+    if (bufferContains("lights")) { // LIGHTS [On / Off]
       if (bufferContains("on")) {
         setLight(true);
         txLine("Button Lights ON");
@@ -443,15 +457,15 @@ int main(void) {
         setLight(false);
         txLine("Button Lights OFF");
       }
-    } else if (bufferContains("tone")) {
-      // b l i n k _ x x ...
-      // 0 1 2 3 4 5 6 7 ...
+      txByte(EOT);
+      txByte(EOL);
+    } else if (bufferContains("tone")) { // TONE [Duration] [Frequincy]
       uint16_t duration = getBufferDecimal();
       uint16_t targetFreq = getBufferDecimal();
+      // Set tone frequency and duration.
       uint16_t actualFreq = setToneFreq(targetFreq);
-      setSound(true);
       toneDuration = duration;
-      toneTimer = 0;
+      setSound(true);
       char duration_s[16];
       utoa(duration, duration_s, 10);
       char freq_s[16];
@@ -461,7 +475,9 @@ int main(void) {
       txLine(" ms with a frequency of ");
       txLine(freq_s);
       txLine(" Hz");
-    } else if (bufferContains("setear")) {
+      txByte(EOT);
+      txByte(EOL);
+    } else if (bufferContains("setear")) { // SETEAR [Left / Right]
       if (bufferContains("right")) {
         setEar(true);
         txLine("Turned on RIGHT ear");
@@ -469,7 +485,9 @@ int main(void) {
         setEar(false);
         txLine("Turned on LEFT ear");
       }
-    } else if (bufferContains("test")) {
+      txByte(EOT);
+      txByte(EOL);
+    } else if (bufferContains("test")) { // TEST [Left / Right] [Frequency]
       // Get target ear and target frequecy
       bool isEarRight = false;
       if (bufferContains("right")) {
@@ -493,7 +511,7 @@ int main(void) {
         txLine(" ear with a frequncy of ");
         txLine(freq_s);
         txLine(" Hz. Waiting for test input...");
-        txLine(EOL);
+        txByte(EOL);
         // Start test
         // Play sound by turning on PWM output
         reactionTime = 0;
@@ -507,11 +525,11 @@ int main(void) {
         } else {
           txLine(pressedButton ? "RIGHT" : "LEFT");
           txLine(" button pressed after ");
-          // txUint(reactionTime);
+          txUint(reactionTime);
           txLine(" ms.");
-          txByte(EOT);
-          txByte(EOL);
         }
+        txByte(EOT);
+        txByte(EOL);
       } else {
         txLine("Input Error");
         txByte(EOT);

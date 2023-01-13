@@ -15,6 +15,9 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 
+# Range for frequencies
+rangeTestFreqs = [100, 200, 400, 800, 1600, 3200, 6400, 10000]
+
 # End Of Transmission Character
 EOT = ':'
 EOL = ';'
@@ -49,6 +52,7 @@ print(bcolors.BOLD + "Valdemar 3.E & Victor 3.M's høretabs projekt \n" + bcolor
 while True:
     # Write
     command = (str(input(bcolors.HEADER + "> " + bcolors.ENDC)).lower())
+    print(command)
     # unencoded
     if command == "help" or command == "?":
         print(r"""
@@ -61,7 +65,20 @@ while True:
             Test an ear with a given frquency. Return user input.
         - setEar [left/right]
             Turns on left or right ear.
+        - rangeTest [left/right]
+            Starts a full test on either left or right ear (100 Hz - 10000 Hz). 
         """)
+    elif "rangetest" in command:
+        side = "right" in command
+        for f in rangeTestFreqs:
+            command = f"test {'right' if side else 'left'} {f}"
+            print(command)
+            ser.write((command+EOT+EOL).encode())
+            line = ser.read_until(EOL.encode()).decode("utf-8")[:-1]
+            print(bcolors.OKGREEN + line + bcolors.ENDC + "\n")
+            line = ser.read_until(EOL.encode()).decode("utf-8")[:-1]
+            print(bcolors.OKGREEN + line + bcolors.ENDC + "\n")
+            time.sleep(1)
     else:
         ser.write((command+EOT+EOL).encode())
         print((command+EOT+EOL).encode())
