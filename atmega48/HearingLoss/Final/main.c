@@ -204,8 +204,6 @@ volatile char uartBuffer[32]; // 32 characters
 volatile uint8_t bufferIndex = 0;
 volatile uint8_t readIndex = 0;
 volatile bool byteReceived = false;
-// Array of frequencies to use in the full test
-int test_frequencies[8] = {100, 200, 400, 800, 1600, 3200, 6400, 10000};
 void setLight(bool);
 
 ISR(USART_RX_vect) {
@@ -221,8 +219,7 @@ ISR(TIMER0_COMPA_vect) { toneTimer++; }
 // Interupt when timer1 reaches TOP = ICR1, every PWM cycle.
 ISR(TIMER1_CAPT_vect) {
   sineIndex += indexIncrement;
-  if (sineIndex >= 2047)
-  {
+  if (sineIndex >= 2047) {
     sineIndex -= 2047;
   }
     OCR1A = pgm_read_byte(&sine100_2048[sineIndex]);
@@ -232,9 +229,10 @@ void initUart(void) {
   uint16_t ubrr0 = ((F_CPU) / (BAUDRATEVAL * 16UL) - 1);
   UBRR0H = (ubrr0 >> 8);
   UBRR0L = (ubrr0);
-  UCSR0B = (1 << TXEN0) | (1 << RXEN0) | (1 << RXCIE0); // Transmit enabled, Recieve enabled, Recieve interupt
-  // enabled.
-  UCSR0C = (1 << UCSZ00) | (1 << UCSZ01); // 8-bit, no parity, one stop bit
+  // Transmit enabled, Recieve enabled, Recieve interupt enabled.
+  UCSR0B = (1 << TXEN0) | (1 << RXEN0) | (1 << RXCIE0); 
+  // 8-bit, no parity, one stop bit
+  UCSR0C = (1 << UCSZ00) | (1 << UCSZ01); 
 }
 
 void txByte(char data) {
@@ -245,8 +243,7 @@ void txByte(char data) {
 void txLine(char data[]) {
   uint8_t i = 0;
   // Transmit chars one by one
-  while (data[i] != 0)
-  {
+  while (data[i] != 0) {
     txByte(data[i]);
     i++;
   }
@@ -258,18 +255,10 @@ void txUint(uint16_t n) {
   txLine(s);
 }
 
-unsigned char rxByte(void) {
-  while (!(UCSR0A & (1 << RXC0)))
-    ; // Wait while register is free
-  return UDR0;
-}
-
-bool bufferContains(char val[]) {
+bool bufferContains(char s[]) {
   uint8_t i = 0;
-  while (val[i])
-  {
-    if (val[i] != uartBuffer[i + readIndex])
-    {
+  while (s[i]) {
+    if (s[i] != uartBuffer[i + readIndex]) {
       return false;
     }
     i++;
@@ -288,14 +277,9 @@ uint16_t getBufferDecimal() {
   { // Terminate at space of EOL
     // Convert utf-8 to digit
     uint8_t digit = (uint8_t)uartBuffer[i + readIndex] - 48;
-    if (digit >= 0 && digit <= 9)
-    {
+    if (digit >= 0 && digit <= 9) {
       num *= 10;
       num += (uint16_t)digit;
-    }
-    else
-    {
-      // ignore
     }
     i++;
   }
@@ -364,24 +348,20 @@ bool pLeftIsPressed = false;
 bool pRightIsPressed = false;
 
 void update() {
-  if (tonePlaying)
-  {
+  if (tonePlaying) {
+    // Check timeout
+    if (toneTimer > toneDuration) {
+      setSound(false);
+    }
     // Buttons are pulled up, and 0 when pressed.
     bool leftIsPressed = !BITVAL(PINC, PC4);
     bool rightIsPressed = !BITVAL(PINC, PC5);
     // Check button input
-    if ((leftIsPressed && !pLeftIsPressed) || (rightIsPressed && !pRightIsPressed))
-    {
+    if ((leftIsPressed && !pLeftIsPressed) || (rightIsPressed && !pRightIsPressed)) {
       reactionTime = toneTimer;
       setSound(false);
       // Variable that contains which button is pressed, if the right isn't
-      // pressed, the left is.
       pressedButton = rightIsPressed;
-    }
-    // Check timeout
-    if (toneTimer > toneDuration)
-    {
-      setSound(false);
     }
     // Update previous-values
     pLeftIsPressed = leftIsPressed;
