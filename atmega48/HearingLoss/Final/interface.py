@@ -17,6 +17,9 @@ class bcolors:
 # Test subject profile
 profileAge = "Unkown"
 profileGender = "Unkown"
+profileDiagnosedHearingloss = "Unkown"
+profileMusicHoursPerDay = "Unkown"
+profileTestPlace = "Unkown"
 
 # Range for frequencies
 rangeTestFreqs = [100, 200, 400, 800, 1600, 3200, 6400, 10000]
@@ -53,8 +56,8 @@ def exportResults(name):
     with open("./Results/"+name+".csv", 'w', newline='') as file:
         writer = csv.writer(file, delimiter=';')
         # Write subject profile
-        writer.writerow(["Age", "Gender"])
-        writer.writerow([profileAge, profileGender])
+        writer.writerow(["Age", "Gender", "Diagnosed Hearingloos", "Music Hours per Day", "Test Place"])
+        writer.writerow([profileAge, profileGender, profileDiagnosedHearingloss, profileMusicHoursPerDay, profileTestPlace])
         # Write test results
         writer.writerow(["Test Frequency", "Test Ear", "Pressed Button", "Reaction Time"])
         for pair in fullTestResults:
@@ -125,7 +128,7 @@ while True:
             Turns on left or right ear.
         - fullTest
             Starts a full test on both ears (100 Hz - 10000 Hz).
-        - setProfile [Age] [M/F]
+        - setProfile [Age] [M/F] [Diagnosed Hearingloss] [Music Hours pr. day] [Test Place]
             Updates test subject profile.
         - exportResults [Name]
             Exports results along with subject profile in a csv.
@@ -136,6 +139,9 @@ while True:
         words = command.split()
         profileAge = words[1]
         profileGender = words[2]
+        profileDiagnosedHearingloss = words[3]
+        profileMusicHoursPerDay = words[4]
+        profileTestPlace = words[5]
     elif "exportresults" in command:
         words = command.split()
         name = "temp"
@@ -144,8 +150,6 @@ while True:
         exportResults(name)
     else:
         ser.write((command+EOT+EOL).encode())
-        print((command+EOT+EOL).encode())
-
         # Listen
         while True:
             # All lines are terminated with \n
